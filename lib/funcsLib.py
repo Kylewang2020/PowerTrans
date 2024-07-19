@@ -181,6 +181,12 @@ def get_mix_device(audio, host_api_index=0):
             return i
     return None
 
+
+def is_text_char(char):
+    # 判断是否是英文字母或汉字
+    return char.isalpha() or ('\u4e00' <= char <= '\u9fff')
+
+
 if __name__ == '__main__':
     fileName = GetFileName(isMic=True, id=1)
     print(fileName)

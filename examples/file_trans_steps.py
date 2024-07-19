@@ -19,15 +19,21 @@ def decode_file(model, waveFile, detect_language=True):
     if detect_language:
         start = time.time()
         _, probs = model.detect_language(mel)
+        language = max(probs, key=probs.get)
         time_consume_print(start, "detect_language")
-        print(f"    Detected language: {max(probs, key=probs.get)}")
+        print(f"    Detected language: {language}")
 
     # decode the audio
     start = time.time()
     # options = whisper.DecodingOptions(language="en")
     options = whisper.DecodingOptions()
     result = whisper.decode(model, mel, options)
-    time_consume_print(start, "decode")
+    time_consume_print(start, "decode1")
+    # decode the audio 2
+    start = time.time()
+    options = whisper.DecodingOptions(language=language)
+    result = whisper.decode(model, mel, options)
+    time_consume_print(start, "decode2")
 
     return result
 
@@ -35,11 +41,11 @@ start = time.time()
 model = whisper.load_model("base", download_root="D:\\github\\whisper")
 time_consume_print(start, "load_model")
 
-# waveFile = ".//test_data//chinese01.wav"
+waveFile = ".//test_data//chinese01.wav"
 # waveFile = ".//test_data//english01.wav"
-waveFile = ".//test_data//japan01.wav"
+# waveFile = ".//test_data//japan01.wav"
 for i in range(3):
     print("Times {}:".format(i))
-    result = decode_file(model, waveFile, detect_language=False)
+    result = decode_file(model, waveFile, detect_language=True)
 
 print(result.text)

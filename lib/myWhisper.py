@@ -26,7 +26,7 @@ for _ in range(5):
         if __dir_name not in sys.path:
             sys.path.insert(0, __dir_name)
         break
-from lib.funcsLib import timer, log_init
+from lib.funcsLib import timer, log_init, is_text_char
 
 
 isTimerOn = True
@@ -43,6 +43,7 @@ class my_whisper(object):
         self.isRun  = False
         self.isRealtime = isRealtime
         self.audioQueue = queue.Queue(maxsize=10)
+        self.language   = None
         self.callBack   = None
         if logger is None:
             self.log = log_init("my_whisper.log", 3, logging.DEBUG)
@@ -52,13 +53,47 @@ class my_whisper(object):
 
 
     def __del__(self):
-        self.stop()
+        if self.isRun:
+            self.stop()
 
 
     @timer(4, isTimerOn)
     def init(self, model="base",folder="D:\\github\\whisper"):
         self.model  = whisper.load_model(model, download_root=folder)
         self.isInit = True
+
+    
+    @timer(4, isTimerOn)
+    def detect_language(self, waveFile):
+        '''确定音频文件的语音类型'''
+        if not self.isInit:
+            self.log.error("my_whisper object not Inited")
+            return
+        if waveFile is not None:
+            audio = whisper.load_audio(waveFile)
+            audio = whisper.pad_or_trim(audio)
+            mel = whisper.log_mel_spectrogram(audio).to(self.model.device)
+            _, probs = self.model.detect_language(mel)
+            self.log.debug(f"当前语音类型是:{max(probs, key=probs.get)}")
+            return max(probs, key=probs.get)
+
+
+    def get_res_txt(self, res):
+        resTxt = ""
+        try:
+            if isinstance(res, whisper.decoding.DecodingResult):
+                resTxt = res.text
+            elif isinstance(res, dict):
+                for segment in res['segments']:
+                    resTxt += segment['text']
+                    if is_text_char(segment['text'][-1]):
+                        resTxt += ", "
+            else:
+                self.log.error(f"Wrong result type: {type(res)}!")
+        except Exception as e:
+            self.log.warning(f"get result txt wrong: {e}")
+        finally:
+            return resTxt
 
 
     @timer(4, isTimerOn)
@@ -67,7 +102,7 @@ class my_whisper(object):
         if not self.isInit:
             self.log.error("my_whisper object not Inited")
             return None
-        result = None
+        res = None
         try:
             # TODO 是否可以不用音频文件，而是直接使用音频数据?
             if waveFile is not None:
@@ -76,11 +111,11 @@ class my_whisper(object):
                 audio = whisper.pad_or_trim(audio)      # 耗时 0.00 秒左右
                 # make log-Mel spectrogram and move to the same device as the model
                 mel = whisper.log_mel_spectrogram(audio).to(self.model.device) #耗时 0.01 秒左右
-                # options = whisper.DecodingOptions(language="en")
-                options = whisper.DecodingOptions()
-                result = whisper.decode(self.model, mel, options)
-                print(' '*4, result.text)
-                return result.text
+                if self.language is None:
+                    self.language = self.detect_language(waveFile)
+                options = whisper.DecodingOptions(language=self.language)
+                res = whisper.decode(self.model, mel, options)
+                return self.get_res_txt(res)
         except Exception as e:
             self.log.error("trans_failed: {}".format(e))
         return None
@@ -92,15 +127,15 @@ class my_whisper(object):
         if not self.isInit:
             self.log.error("my_whisper object not Inited")
             return None
-        result = None
+        res = None
         try:
             # TODO 是否可以不用音频文件，而是直接使用音频数据?
             if waveFile is not None:
                 self.log.debug('trans_start. {}'.format(waveFile))
-                result = self.model.transcribe(waveFile)
-                for segment in result['segments']:
-                    print(' '*4, segment['text'])
-                return result
+                if self.language is None:
+                    self.language = self.detect_language(waveFile)
+                res = self.model.transcribe(waveFile, language=self.language)
+                return self.get_res_txt(res)
         except Exception as e:
             self.log.error("trans_failed: {}".format(e))
         return None
@@ -161,21 +196,38 @@ class my_whisper(object):
 if __name__ == '__main__':
     isTimerOn = True
     myWhisper = my_whisper()
-    myWhisper.init()
-    # waveFile = ".//test_data//chinese01.wav"
+    myWhisper.init(model="medium")
+    waveFile = ".//test_data//chinese01.wav"
     # waveFile = ".//test_data//english01.wav"
     waveFile = ".//test_data//japan01.wav"
-    # res = myWhisper.trans(waveFile)
-    # print(res)
 
-    try:
-        # myWhisper.run()
-        for i in range(3):
-            # myWhisper.add_audio(waveFile)
-            res = myWhisper.trans2(waveFile)
-            time.sleep(5)
-        myWhisper.stop()
-    except KeyboardInterrupt:
-        myWhisper.stop()
-        print("  Stop by KeyboardInterrupt!")
-    del myWhisper
+    def test1(myWhisper): # 手动运行
+        print("手动调用运行:")
+        try:
+            for i in range(3):
+                res = myWhisper.trans(waveFile)
+                print(f"    Result= \"{res}\"")
+            myWhisper.language = None
+            for i in range(3):
+                res = myWhisper.trans2(waveFile)
+                print(f"    Result= \"{res}\"")
+            myWhisper.stop()
+        except KeyboardInterrupt:
+            myWhisper.stop()
+            print("  Stop by KeyboardInterrupt!")
+        del myWhisper
+
+    def test2(myWhisper): # 自动运行
+        print("自动调用运行:")
+        try:
+            myWhisper.run()
+            for i in range(1):
+                myWhisper.add_audio(waveFile)
+                time.sleep(5)
+            myWhisper.stop()
+        except KeyboardInterrupt:
+            myWhisper.stop()
+            print("  Stop by KeyboardInterrupt!")
+        del myWhisper
+    
+    test1(myWhisper)

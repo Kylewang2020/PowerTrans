@@ -15,6 +15,10 @@ waveFile = ".//test_data//japan01.wav"
 for i in range(3):
     print("Times {}:".format(i))
     start = time.time()
-    result = model.transcribe(waveFile, language='ja')
-    time_consume_print(start, "transcribe")
-
+    result = model.transcribe(waveFile)
+    # print(result)
+    time_consume_print(start, "transcribe1")
+    start = time.time()
+    result = model.transcribe(waveFile, language='zh')
+    # print(result)
+    time_consume_print(start, "transcribe2")
