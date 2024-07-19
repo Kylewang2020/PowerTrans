@@ -15,6 +15,13 @@ Whisper 使用学习笔记
   - [x] 实时屏幕显示
   - [ ] 保存为字幕文件
 
+## 实现方式
+
+- 三个对象
+  - 窗口对象myWin(tk窗口, 实现字幕的显示)
+  - 录音对象myRecorder(实现实时音频的抓取)
+  - whisper模型对象封装
+  
 ## 语音活动检测（VAD）
 
 [WebRTC VAD](https://github.com/wiseman/py-webrtcvad)
