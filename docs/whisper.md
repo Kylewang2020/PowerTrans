@@ -1,28 +1,56 @@
-# whisper 模型使用经验
+# Whisper
 
-## transcribe方法和decode方法
+Whisper 是一种通用语音识别模型。它是在大量不同音频数据集上进行训练的，也是一个多任务模型，可以执行多语言语音识别、语音翻译和语言识别。
+[Whisper](https://github.com/openai/whisper)
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+[语音识别whisper的介绍、安装、错误记录](https://blog.csdn.net/zdm_0301/article/details/133854913)
+[FileNotFoundError: [WinError 2] 系统找不到指定的文件](https://blog.csdn.net/qq_24118527/article/details/90579328)
 
-### transcribe 方法
+## 安装步骤
 
->transcribe 方法是一个高级接口，用于简化语音转文本的整个过程。它包含了从音频加载、特征提取到最终转录结果的所有步骤。这个方法非常方便，因为它隐藏了许多细节，并且通常是使用 Whisper 模型进行语音识别的首选方法。
+[Windows系统 Whisper(OpenAI) 安装指南（全局python环境）](https://www.bilibili.com/read/cv25735051/)
 
-### decode 方法
+``` sh
+# 1-配置环境
+#   PyTorch + Python
 
-> decode 方法是一个低级接口，提供了更多的灵活性和控制。使用 decode 方法时，需要手动处理音频加载和特征提取，然后将处理后的特征输入到 decode 方法中。这个方法适合需要自定义处理流程或进行更高级控制的场景。
+# 2-whisper (798 kb)
+pip install -U openai-whisper
 
-### 关键区别
+# 3-ffmpeg 安装，
+# 并将可执行目录添加到环境变量中，在cmd窗口中可以运行ffmpeg命令即可
 
-- 使用简便性:
-transcribe: 高级接口，使用简便，适合快速实现。
-decode: 低级接口，提供更多控制，适合高级应用。
-- 处理步骤:
-transcribe: 自动完成音频加载、预处理和特征提取。
-decode: 需要手动处理音频加载和特征提取。
-- 灵活性:
-transcribe: 较低，适合标准应用场景。
-decode: 较高，适合需要自定义处理的复杂场景。
+```
 
-### 何时使用 transcribe 和 decode
+## whisper 常用命令
 
-- 使用 transcribe: 如果你的应用场景是标准的语音转文本任务，并且不需要对处理流程进行细粒度的控制，使用 transcribe 方法会更简单快捷。
-- 使用 decode: 如果你的应用场景需要对音频的加载、预处理、特征提取等步骤进行自定义处理，或者需要在这些步骤中插入额外的处理逻辑，可以使用 decode 方法。
+--model 指定使用的模型
+
+--model_dir 模型存放文件夹
+
+--device PyTorch推理所用设备（默认CUDA，可切换为CPU）
+
+--output_dir 输出文件夹
+
+--output_format 输出格式，默认全格式都输出一份
+
+--language 指定所要扫描的音频使用的语言
+
+--word_timestamps 词级时间戳（更精确的时间戳），推荐打开
+
+## whisper 问题
+
+- c++ 调用？
+  - https://github.com/ggerganov/whisper.cpp
+- whisper 转换的文本为繁体字，可否设定为简体
+
+>Whisper 是一个 OpenAI 的语音识别模型，可以将语音转换为文本。如果你使用的是 Whisper 来进行语音转文本转换，并且希望将输出的文本设定为简体中文，可以通过后处理的方式实现这一点。Whisper 本身可能不会直接提供简体和繁体转换的选项，但你可以使用 Python 的 opencc 库来进行繁体字和简体字之间的转换。
+
+- whisper 直接加载numpy的数据
+
+>可以使用 Whisper 模型直接加载 NumPy 数据。Whisper 模型支持从 NumPy 数组中加载音频数据，这样你可以在内存中直接处理音频而无需保存和加载临时文件。
+
+- Whisper 模型 要求 的 音频数据格式
+  - NumPy 音频数据
+  - 模型期望输入是标准化的单声道音频数据
+  - 采样率为 16000Hz

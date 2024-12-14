@@ -1,8 +1,19 @@
+'''
+@Project:       examples
+@File:          file_trans_steps.py
+@File Created:  Kyle Wang(wangkui2000@hotmail.com) @[2024-07-18 06:05:27]
+@Last Modified: 2024-12-13 03:06:21
+@Copyright:     MIT License 2024-2034 Kyle
+@Function:      whisper 模型加载处理语音文件。decode 方法 分步调用。
+'''
+
 import whisper
 import time
 
+
 def time_consume_print(start, funcName):
     print("  {:<20} 耗时: {:.2f}s".format(funcName, time.time()-start))
+
 
 def decode_file(model, waveFile, detect_language=True):
     # load audio and pad/trim it to fit 30 seconds. 
