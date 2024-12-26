@@ -1,3 +1,6 @@
 /*.code-workspace
 /lib/__pycache__
 /log
+/test
+/test_data
+/clean.bat

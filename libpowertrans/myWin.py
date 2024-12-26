@@ -1,20 +1,13 @@
 from tkinter import Tk, Canvas, Label, StringVar
 from tkinter.constants import BOTH, LEFT
-''' Add project path to sys.path V1.0'''
 import os, sys
-__dir_name = os.path.dirname(os.path.realpath(__file__))
-for _ in range(5):
-    if "audio_lib" not in os.listdir(__dir_name):
-        __dir_name =  os.path.dirname(__dir_name)
-    else:
-        if __dir_name not in sys.path:
-            sys.path.insert(0, __dir_name)
-        break
-from audio_lib.funcsLib import logging, log_init
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+from libpowertrans.funcsLib import logging, log_init
 
 # bg_color = ["lightgrey", "silver", "darkgrey", "grey", "dimgrey"]
 bg_color = "darkgrey"
-
 
 class myWin(object):
     def __init__(self, width=500, height=80, txtSize=16, maxWidth=1000, minWidth=300,
@@ -132,7 +125,7 @@ class myWin(object):
 
 
 if __name__ == '__main__':
-    logger = log_init(logF="myWin.log")
+    logger = log_init(LogFileName="myWin.log")
     myApp  = myWin(logger=logger, txtSize=10)
     myApp.autoTxt()
     myApp.win.mainloop()

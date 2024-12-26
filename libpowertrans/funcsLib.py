@@ -29,7 +29,7 @@ ParentDir  = os.path.dirname(CurrentDir)
 LogPath    = CurrentDir
 
 
-def log_init(logF="log.log", logOut=3, logL=logging.DEBUG, path=None):
+def log_init(LogFileName="log.log", logOut=3, logL=logging.DEBUG, path=None, logger_name=None):
     '''
     日志初始化. 
         logOut: 1=file only; 2=console only; 3=both 
@@ -37,10 +37,8 @@ def log_init(logF="log.log", logOut=3, logL=logging.DEBUG, path=None):
     '''
     logger = None
     try:
-        logger = logging.getLogger(__name__)
+        logger = logging.getLogger(logger_name)
         logger.setLevel(level=logL)
-        # formatter= logging.Formatter(datefmt='%H:%M:%S',
-        #     Fmt='[%(levelname)-5s|%(asctime)s.%(msecs)03d|%(thread)s|%(lineno)d@%(funcName)s()] %(message)s' )
         formatter= logging.Formatter(datefmt='%H:%M:%S',
             fmt='[%(levelname)-5s|%(asctime)s.%(msecs)03d|%(thread)s|%(lineno)d@%(funcName)s()] %(message)s' )
         if logOut==2 or logOut==3:
@@ -52,11 +50,11 @@ def log_init(logF="log.log", logOut=3, logL=logging.DEBUG, path=None):
                 path = os.getcwd()
                 path = os.path.join(path, "log")
             if not os.path.exists(path): os.mkdir(path)
-            logF = os.path.join(path, logF)
-            handler = logging.FileHandler(logF, encoding='utf-8')
+            LogFileName = os.path.join(path, LogFileName)
+            handler = logging.FileHandler(LogFileName, encoding='utf-8')
             handler.setFormatter(formatter)
             logger.addHandler(handler)
-            logger.debug("log[level:{}, output:{}, file: \"{}\"]".format(logL, logOut, logF))
+            logger.debug("log_level:{}, output:{}, file: \"{}\"".format(logL, logOut, LogFileName))
     except Exception as e:
         print("logger init failed:", e)
     
