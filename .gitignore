@@ -4,3 +4,7 @@
 /test
 /test_data
 /clean.bat
+/resources/SenseVoice/sense-voice-encoder.onnx
+/resources/SenseVoice/sense-voice-encoder-int8.onnx
+__pycache__
+/temp

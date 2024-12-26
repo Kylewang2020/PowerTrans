@@ -1,74 +1,79 @@
 #!/usr/bin/env python
-# -*- encoding: utf-8 -*-
-'''
-@File    :   funcs.py
-@Time    :   2024/06/05 17:01:39
-@Author  :   Kyle Wang 
-@Version :   1.0
-@Contact :   wangkui2000@hotmail.com
-@License :   (C)Copyright 2017-2030, KyleWang
-@Desc    :   通用函数定义
-'''
-
-import logging
+# =========================================
+# -*- coding: utf-8 -*-
+# Project     : power_trans
+# Module      : funcsLib.py
+# Author      : KyleWang[kylewang1977@gmail.com]
+# Time        : 2024-12-26 20:26
+# Version     : 1.0.0
+# Last Updated: 
+# Description : 通用函数定义
+#               
+# =========================================
 import time
+import logging
 from datetime import datetime
-''' Add project path to sys.path V1.0'''
+""" Add project path to sys.path V1.0"""
 import os, sys
-__dir_name = os.path.dirname(os.path.realpath(__file__))
-for _ in range(5):
-    if "lib" not in os.listdir(__dir_name):
-        __dir_name =  os.path.dirname(__dir_name)
-    else:
-        if __dir_name not in sys.path:
-            sys.path.insert(0, __dir_name)
-        break
-
-CurrentDir = os.path.dirname(os.path.realpath(__file__))
-ParentDir  = os.path.dirname(CurrentDir)
-LogPath    = CurrentDir
+if __name__ == "__main__":
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+    if project_root not in sys.path:
+        sys.path.insert(0, project_root)
 
 
-def log_init(LogFileName="log.log", logOut=3, logL=logging.DEBUG, path=None, logger_name=None):
-    '''
+def log_init(
+    LogFileName:str = "log.log", 
+    FilePath:os.PathLike = "./log", 
+    logOutput:int = 3, 
+    logLevel:int = logging.DEBUG, 
+    logger_name:str = None
+    ):
+    """
     日志初始化. 
-        logOut: 1=file only; 2=console only; 3=both 
-        logL  : logging level. logging.DEBUG, logging.INFO...
-    '''
+
+    Parameters
+    ----------
+    LogFileName:  str
+        file name of the log file.
+    FilePath: os.PathLike
+        log file's path
+    logOutput: int
+        [1:log file only; 2:console only; 3:both]. 
+    logLevel:  int
+        same as the defination in logging module. logging.DEBUG, logging.INFO...
+    logger_name: str
+        if logger_name is None, then use the default and update it to the settings.
+    """
     logger = None
     try:
         logger = logging.getLogger(logger_name)
-        logger.setLevel(level=logL)
+        logger.setLevel(level=logLevel)
         formatter= logging.Formatter(datefmt='%H:%M:%S',
-            fmt='[%(levelname)-5s|%(asctime)s.%(msecs)03d|%(thread)s|%(lineno)d@%(funcName)s()] %(message)s' )
-        if logOut==2 or logOut==3:
+            fmt='[%(levelname)-5s|%(asctime)s.%(msecs)03d|%(thread)s|%(lineno)03d@%(funcName)-9s]: %(message)s')
+        if logOutput==2 or logOutput==3:
             console = logging.StreamHandler()
             console.setFormatter(formatter)
             logger.addHandler(console)
-        if logOut==1 or logOut==3:
-            if path is None:
-                path = os.getcwd()
-                path = os.path.join(path, "log")
-            if not os.path.exists(path): os.mkdir(path)
-            LogFileName = os.path.join(path, LogFileName)
+        if logOutput==1 or logOutput==3:
+            if not os.path.exists(FilePath): os.mkdir(FilePath)
+            LogFileName = os.path.join(FilePath, LogFileName)
             handler = logging.FileHandler(LogFileName, encoding='utf-8')
             handler.setFormatter(formatter)
             logger.addHandler(handler)
-            logger.debug("log_level:{}, output:{}, file: \"{}\"".format(logL, logOut, LogFileName))
+            logger.debug("log_level:{}, output:{}, file: \"{}\"".format(logLevel, logOutput, LogFileName))
     except Exception as e:
         print("logger init failed:", e)
     
     if logger is None:
         raise Exception("logger init failed.")
-    else:
-        return logger
+    return logger
 
 
 def timer(indent=2, isTimer=True):
-    '''
+    """
     Decorator to count the time consuming. 
     Could stop by set the var isTimer=False.
-    '''
+    """
     def decorator(func):
         def wrapper(*args, **kwargs):
             if isTimer: start_time = time.time()
@@ -147,10 +152,10 @@ def find_stereo_mix_device(audio, host_api_index=0):
 
 
 def GetFileName(id=None, folder=None, isMic=None, Channels=2, Rate=44100, Fmt="paInt16", suffix=".wav"):
-    '''
+    """
     获取录音文件名称。缺省为当前运行目录下的data子目录中
     如: D08_01-54-32_Speaker_channels1_rate16000_paFloat32_No-1.wav
-    '''
+    """
     # 创建目录
     if folder is None:
         path = os.getcwd()
