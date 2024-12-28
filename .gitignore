@@ -8,3 +8,8 @@
 /resources/SenseVoice/sense-voice-encoder-int8.onnx
 __pycache__
 /temp
+/examples/wave_draw_play.py
+/examples/wave_draw_play_rt.py
+/examples/device
+/examples/device_list.py
+/examples/device_tools

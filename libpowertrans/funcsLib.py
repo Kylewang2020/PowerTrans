@@ -20,6 +20,11 @@ if __name__ == "__main__":
     if project_root not in sys.path:
         sys.path.insert(0, project_root)
 
+_outputToName = {
+    1: 'File',
+    2: 'Stream',
+    3: 'Stream&File',
+}
 
 def log_init(
     LogFileName:str = "log.log", 
@@ -29,7 +34,7 @@ def log_init(
     logger_name:str = None
     ):
     """
-    日志初始化. 
+    日志初始化. V2.0.
 
     Parameters
     ----------
@@ -48,8 +53,14 @@ def log_init(
     try:
         logger = logging.getLogger(logger_name)
         logger.setLevel(level=logLevel)
-        formatter= logging.Formatter(datefmt='%H:%M:%S',
-            fmt='[%(levelname)-5s|%(asctime)s.%(msecs)03d|%(thread)s|%(lineno)03d@%(funcName)-9s]: %(message)s')
+        if logLevel > logging.DEBUG:
+            formatter= logging.Formatter(
+                fmt = '[%(levelname)-5s|%(asctime)s.%(msecs)03d|%(thread)s|%(lineno)03d@%(funcName)-9s]: %(message)s',
+                datefmt='%m-%d %H:%M:%S')
+        else:
+            formatter = logging.Formatter(
+                fmt = '[%(levelname)-5s|%(asctime)s.%(msecs)03d|%(thread)s|%(filename)s:%(lineno)d@%(funcName)s]: %(message)s',
+                datefmt = '%m-%d %H:%M:%S')
         if logOutput==2 or logOutput==3:
             console = logging.StreamHandler()
             console.setFormatter(formatter)
@@ -60,7 +71,8 @@ def log_init(
             handler = logging.FileHandler(LogFileName, encoding='utf-8')
             handler.setFormatter(formatter)
             logger.addHandler(handler)
-            logger.debug("log_level:{}, output:{}, file: \"{}\"".format(logLevel, logOutput, LogFileName))
+            logger.info("log_level:{}, output:{}, file: \"{}\"".format(
+                logging.getLevelName(logLevel), _outputToName.get(logOutput), LogFileName))
     except Exception as e:
         print("logger init failed:", e)
     
@@ -131,7 +143,9 @@ def get_date_time_string():
 # 枚举所有 指定 host_api的音频设备
 def list_audio_devices(audio, host_api_index=0):
     info = audio.get_host_api_info_by_index(host_api_index)
+    print(info)
     num_devices = info.get('deviceCount')
+    print(num_devices)
     
     for i in range(num_devices):
         device_info = audio.get_device_info_by_host_api_device_index(0, i)
@@ -190,7 +204,30 @@ def is_text_char(char):
     return char.isalpha() or ('\u4e00' <= char <= '\u9fff')
 
 
+def print_progress_bar(iteration, total, length=50):
+    """
+    打印进度条
+    :param iteration: 当前进度
+    :param total: 总进度
+    :param length: 进度条的长度（字符数）
+    """
+    percent = ("{0:.1f}").format(100 * (iteration / float(total)))  # 计算进度百分比
+    filled_length = int(length * iteration // total)  # 已完成的部分
+    bar = '\u2588' * filled_length + '-' * (length - filled_length)  # 进度条
+    print(f'\r[{bar}] {percent}%', end='')  # 使用 end='' 防止换行并更新进度条
+    if iteration==total: print()
+
+
 if __name__ == '__main__':
-    fileName = GetFileName(isMic=True, id=1)
-    print(fileName)
-    list_audio_devices()
+    # log_init()
+    # print(logging.getLogger().getEffectiveLevel())
+    
+    # For Audio Funcs test
+    import wave, pyaudio
+
+    PyAudio = pyaudio.PyAudio()
+    list_audio_devices(PyAudio)
+
+    mix_id = find_stereo_mix_device(PyAudio)
+    print(mix_id)
+

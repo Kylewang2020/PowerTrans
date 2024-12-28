@@ -847,7 +847,7 @@ class FSMNVad(object):
 
     def segments_offline(self, waveform_path: Union[str, Path, np.ndarray]):
         """get sements of audio"""
-
+        logging.debug(f"vad segments start")
         if isinstance(waveform_path, np.ndarray):
             waveform = waveform_path
         else:
@@ -870,4 +870,4 @@ class FSMNVad(object):
         segments_part, in_cache = self.vad.infer_offline(
             feats[None, ...], waveform, is_final=True
         )
-        return segments_part[0]
+        return segments_part[0] if segments_part else []
