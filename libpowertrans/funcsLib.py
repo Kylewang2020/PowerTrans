@@ -8,7 +8,6 @@
 # Version     : 1.0.0
 # Last Updated: 
 # Description : 通用函数定义
-#               
 # =========================================
 import time
 import logging
@@ -211,23 +210,40 @@ def print_progress_bar(iteration, total, length=50):
     :param total: 总进度
     :param length: 进度条的长度（字符数）
     """
-    percent = ("{0:.1f}").format(100 * (iteration / float(total)))  # 计算进度百分比
+    percent = ("{0:5.1f}").format(100 * (iteration / float(total)))  # 计算进度百分比
     filled_length = int(length * iteration // total)  # 已完成的部分
     bar = '\u2588' * filled_length + '-' * (length - filled_length)  # 进度条
-    print(f'\r[{bar}] {percent}%', end='')  # 使用 end='' 防止换行并更新进度条
-    if iteration==total: print()
+    print(f'\r{percent}% [{bar}]', end='')  # 使用 end='' 防止换行并更新进度条
+    # if iteration==total: print()
 
 
 if __name__ == '__main__':
     # log_init()
     # print(logging.getLogger().getEffectiveLevel())
     
-    # For Audio Funcs test
-    import wave, pyaudio
+    def audio_test():
+        # For Audio Funcs test
+        import wave, pyaudio
 
-    PyAudio = pyaudio.PyAudio()
-    list_audio_devices(PyAudio)
+        PyAudio = pyaudio.PyAudio()
+        list_audio_devices(PyAudio)
 
-    mix_id = find_stereo_mix_device(PyAudio)
-    print(mix_id)
-
+        mix_id = find_stereo_mix_device(PyAudio)
+        print(mix_id)
+    
+    def bar_test():
+        # import time
+        # for i in range(60):
+        #     print_progress_bar(i, 50)
+        #     time.sleep(0.05)
+        # 红色文本
+        print("\033[31mThis is red text\033[0m")
+        # 绿色文本
+        print("\033[32m This is green text\033[0m")
+        # 蓝色文本
+        print("\033[34mThis is blue text\033[0m")
+        log_init()
+        logging.debug("\033[34mThis is blue text\033[0m") 
+        for i in range(3):
+            logging.debug(f"\033[32m This is blue text {i}\033[0m {i}") 
+    bar_test()

@@ -1,6 +1,8 @@
 yaml
 numpy
+pyaudio
+librosa
 soundfile
 kaldi_native_fbank
 sentencepiece
-
+onnxruntime
