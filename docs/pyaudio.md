@@ -9,7 +9,13 @@ PyAudio 根据 MIT 许可证分发
 ## Install
 
 ``` sh
-pip install pyaudio
+# 在 Linux 上安装 PyAudio
+# 1. 安装 portaudio 和编译工具
+sudo apt update
+sudo apt install portaudio19-dev python3-pyaudio
+
+# 2. 然后再次安装 PyAudio
+pip install pyaudio -i https://pypi.tuna.tsinghua.edu.cn/simple
 ```
 
 ## 主要函数

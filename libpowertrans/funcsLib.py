@@ -95,6 +95,7 @@ def timer(indent=2, isTimer=True):
         return wrapper
     return decorator
 
+
 # dict key 字段最大长度
 def dict_key_max_len(curArg):
     max_len = 10
@@ -132,13 +133,6 @@ def print_dict(curArg, isPrintShort=True, indent=4):
         print(' '*indent, curArg)
 
 
-def get_date_time_string():
-    # 获取当前日期时间
-    now = datetime.now()
-    date_time_string = now.strftime("%m_%d_%H_%M_%S")
-    return date_time_string
-
-
 # 枚举所有 指定 host_api的音频设备
 def list_audio_devices(audio, host_api_index=0):
     info = audio.get_host_api_info_by_index(host_api_index)
@@ -147,48 +141,13 @@ def list_audio_devices(audio, host_api_index=0):
     print(num_devices)
     
     for i in range(num_devices):
-        device_info = audio.get_device_info_by_host_api_device_index(0, i)
+        device_info = audio.get_device_info_by_host_api_device_index(host_api_index, i)
         print(f"Device {i}: {device_info['name']}")
         print_dict(device_info)
 
 
 # 查找名称中包含“立体声混音”或“Stereo Mix”的设备编号
 def find_stereo_mix_device(audio, host_api_index=0):
-    info = audio.get_host_api_info_by_index(host_api_index)
-    num_devices = info.get('deviceCount')
-    
-    for i in range(num_devices):
-        device_info = audio.get_device_info_by_host_api_device_index(host_api_index, i)
-        if 'Stereo Mix' in device_info.get('name', '') or '立体声混音' in device_info.get('name', ''):
-            return i
-    return None
-
-
-def GetFileName(id=None, folder=None, isMic=None, Channels=2, Rate=44100, Fmt="paInt16", suffix=".wav"):
-    """
-    获取录音文件名称。缺省为当前运行目录下的data子目录中
-    如: D08_01-54-32_Speaker_channels1_rate16000_paFloat32_No-1.wav
-    """
-    # 创建目录
-    if folder is None:
-        path = os.getcwd()
-        path = os.path.join(path, "data")
-    if not os.path.exists(path): os.mkdir(path)
-
-    fileName = datetime.now().strftime("D%d_%H-%M-%S") + "_" 
-    if isMic is not None:
-        if isMic: fileName += "Mic_"
-        else:     fileName += "Speaker_"
-    fileName += "channels"+ str(Channels)+ "_rate" + str(Rate) + "_" + Fmt
-    if id is not None:
-        fileName += "_No-" + str(id)
-    fileName += suffix
-    fileName = os.path.join(path, fileName)
-    return fileName
-
-
-# 查找名称中包含“立体声混音”或“Stereo Mix”的设备编号
-def get_mix_device(audio, host_api_index=0):
     info = audio.get_host_api_info_by_index(host_api_index)
     num_devices = info.get('deviceCount')
     for i in range(num_devices):
@@ -224,13 +183,12 @@ if __name__ == '__main__':
     def audio_test():
         # For Audio Funcs test
         import wave, pyaudio
-
         PyAudio = pyaudio.PyAudio()
         list_audio_devices(PyAudio)
-
         mix_id = find_stereo_mix_device(PyAudio)
         print(mix_id)
-    
+        PyAudio.terminate()
+
     def bar_test():
         # import time
         # for i in range(60):

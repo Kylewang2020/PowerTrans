@@ -33,7 +33,7 @@ def printRes(result):
     else:
         resTxt = result
     print("  ASR结果: {}".format(resTxt))
-        
+
 
 def main():
     start = time.time()

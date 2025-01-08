@@ -59,6 +59,8 @@ class Recorder(object):
         self.audioId=0
         self.audio_queue = queue.Queue(maxsize=maxQueueSize)
         self.listenT = None
+        self.isRunning = False
+        self.PyAudio = pyaudio.PyAudio()
         logging.debug('*** Recorder object init ***')
 
     def init(self, 
@@ -87,8 +89,7 @@ class Recorder(object):
         :param frames_per_buffer:   Specifies the number of frames per buffer.
         """
         if self.isInit: raise RuntimeError(f"重复初始化!")
-
-        self.PyAudio = pyaudio.PyAudio()
+        self.isStop = False
         try:
             device_id = deviceId
             if device_id is None:
@@ -110,7 +111,7 @@ class Recorder(object):
                                               input=True, 
                                               input_device_index=device_id, 
                                               frames_per_buffer=self.chunkSize )
-            logging.info("录音器: audio_id:{}; sr:{:.2g}k; format={}; channels={}".format(
+            logging.info("录音器Stream: audio_id:{}; sr:{:.2g}k; format={}; channels={}".format(
                 device_id, self.framerate/1000, _paFormat2Name.get(format), channels, device_info["name"]))
             self.isInit = True
         except Exception as e:
@@ -123,13 +124,14 @@ class Recorder(object):
         save_wave:bool=False, 
         mute_check:bool=False,
         speech_completeness:bool=False,
-        return_array:bool=True,
         )->None:
         """
         loop for continuously generate the audio file.
         put the result into the queue: data queue and manage it.
         """
+        if not self.isInit: raise RuntimeError(f"未初始化!")
         logging.info('listen_loop start')
+        self.isRunning = True
         while True:
             if self.audio_queue.full():
                 discard_file = self.audio_queue.get()
@@ -140,11 +142,11 @@ class Recorder(object):
                                      save_wave=save_wave,
                                      mute_check=mute_check,
                                      speech_completeness=speech_completeness,
-                                     return_array=return_array,
                                      )
             if self.isStop: break
             self.audio_queue.put(listen_res)
             logging.debug('audio-queue qsize:{}'.format(self.audio_queue.qsize()))
+        self.isRunning = False
         logging.info('listen_loop end')
 
     def listen(self, 
@@ -153,7 +155,6 @@ class Recorder(object):
         file_name:str=None, 
         mute_check:bool=True,
         speech_completeness:bool=False,
-        return_array:bool=True,
         ):
         """
         Capture the audio data from the select input stream to a file or a ndarray.
@@ -168,7 +169,6 @@ class Recorder(object):
         :param speech_completeness: whether to secure a speech is completed. 
                             when it's true, the duration will be a dynamic one and a max 10 seconds more data could be added.
                             if the mute_check is on, then, the start silent segments will be discard untill there is a voice.
-        :param return_array: Whether convert the raw audio data the a standard np.ndarray and return the array.
 
         Return: Dict["is_save":bool, "file":str, "is_array":bool, "array":np.ndarry, "is_mute":bool]
         ----------
@@ -178,11 +178,10 @@ class Recorder(object):
         if not self.isInit: raise RuntimeError(f"could not listern without init()")
         self.audioId += 1
         
-        res = {"is_save": save_wave, "file": file_name, "is_array":return_array, 
-               "is_mute":False,"array":None}
+        res = {"is_save": save_wave, "file": file_name, "is_mute":False, "array":None}
+        logging.debug((f"数据获取-audioId[{self.audioId}]:{seconds}s ch={self.channels}; sr:{(self.framerate/1000):.3g}k "
+                        f"save:{save_wave}; mute_check:{mute_check}; speech_completeness:{speech_completeness}"))
         if not speech_completeness or seconds<5:
-            logging.debug((f"正常数据获取开始: channels={self.channels}; mute_check:{mute_check}; "
-                           f"speech_completeness:{speech_completeness}"))
             second_bytes_list = []
             total_frames = int(self.framerate*seconds)
             remaining_frames = total_frames
@@ -192,30 +191,26 @@ class Recorder(object):
                 data = self.PyStream.read(num_frames_to_read)
                 second_bytes_list.append(data)
                 remaining_frames -= num_frames_to_read
-                if _IsDEBUG:
+                if _IsDEBUG and seconds>3:
                     print_progress_bar(total_frames-remaining_frames, total_frames)
-            
-            if _IsDEBUG: print()
-            logging.debug((f'Audio[{self.audioId}]:{seconds}s, [ch{self.channels}, sr:{(self.framerate/1000):.3g}k].'
-                        f' save:{save_wave}; r_arr:{return_array}; mute_check:{mute_check}; speech_completeness:{speech_completeness}'))
-            
-            if save_wave:
+            if _IsDEBUG and seconds>3: print()
+            if save_wave and not self.isStop:
                 file_name = self.__saveF(file_name, self.channels, self.sample_size, self.framerate, second_bytes_list)
                 res["file"] = file_name
-            if return_array:
-                array = self.__b2array(second_bytes_list, self.format)
-                res["array"] = array
-                if mute_check and not speech_completeness:
-                    res["is_mute"] = self.muteCheck(array)
-                logging.debug(f'data[max={np.max(res["array"]):.4f}, min={np.min(res["array"]):.4f}, shape:{res["array"].shape}], mute:{res["is_mute"]}')
+            array = self.__b2array(second_bytes_list, self.format)
+            res["array"] = array
+            if mute_check and not speech_completeness:
+                res["is_mute"] = self.__muteEnergyCheck(array)
         else:
             array = self.listen_speech(seconds=seconds, mute_check=mute_check)
-            if save_wave:
+            if save_wave and not self.isStop:
                 file_name = self.__saveF(file_name, self.channels, 2, self.framerate, array)
                 res["file"] = file_name
-            if return_array:
+            if not self.isStop:
                 res["array"] = array
-            logging.debug(f'data[max={np.max(res["array"]):.4f}, min={np.min(res["array"]):.4f}, shape:{res["array"].shape}]')
+        if not self.isStop:
+            logging.debug('array[shape:{}, max={:.4f}, min={:.4f}, 实际时长:{:.1f}s]'.format(
+                res["array"].shape, np.max(res["array"]), np.min(res["array"]), (res["array"].shape[0]/self.framerate)))
         return res
     
     def listen_speech(self, 
@@ -229,7 +224,7 @@ class Recorder(object):
 
         Parameters
         ----------
-        :param seconds:     recording time length. in seconds.
+        :param seconds:     recording time length. in seconds. 期望时长.
         :param mute_check:  whether to check the audio signal is mute or not.
             只会影响到声音数据的开始。对于一次声音捕获而言，如果mute_check==True，
             则必须等待有声音的帧才开始记录捕获数据、开始录音；否则从声音捕获开始录音。
@@ -240,43 +235,49 @@ class Recorder(object):
                 shape=(frames, channels); 
                 dtype=np.float32; data range=[-1, 1]
         """
+        if not self.isInit: raise RuntimeError(f"未初始化!")
         array = None
-        array_seconds = 0
-        second_bytes_list = []
-        read_times = 0
-        second_read_times = round(self.framerate/self.chunkSize)
+        batch_bytes_list = []
+        chunk_read_times  = 0                                       # 当前读取批次 所读取的 次数
+        sum_read_times    = 0                                       # 当前数据 实际 所积累读取 的次数
+        second_read_times = round(self.framerate/self.chunkSize)    # 每秒应该读取的次数
+        min_read_times    = second_read_times*(seconds-2)           # 最小读取次数 = 期望时长减去2s 所需要读取的次数
+        max_read_times    = second_read_times*(seconds+10)          # 最大读取次数 = 期望时长+10s 所需要读取的次数
 
-        logging.debug((f"完整语音数据获取开始: channels={self.channels}; mute_check:{mute_check}; "
-                        f"seconds:{seconds}"))
-        while not self.isStop:
+        logging.info(f"完整语音数据获取开始: ch={self.channels}; mute_check:{mute_check}; chunkSize:{self.chunkSize}")
+        logging.debug(f"期望时长:{seconds}s; 每秒读取次数:{second_read_times}, 最小读取次数={min_read_times}; 最大读取次数:{max_read_times};")
+        # 1. 先按照 1s 的数据进行读取
+        # 2. 对1s的数据开始判断，如果能量值低于阈值，则放弃对应的数据
+        # 3. 检测到有能量的数据后，保存当前1s的数据到 array，array不为空，有了第一秒的数据作为起始
+        batch_times = second_read_times
+        isDone = False
+        while not self.isStop and not isDone:
             data = self.PyStream.read(self.chunkSize)
-            second_bytes_list.append(data)
-            read_times += 1
-            # 对没一秒的数据进行一次处理
-            if read_times < second_read_times:
+            batch_bytes_list.append(data)
+            chunk_read_times += 1
+            # 对每一秒的数据进行一次处理
+            if chunk_read_times < batch_times:
                 continue
-            logging.debug(f"read_times:{read_times}; second_read_times:{second_read_times}; array_seconds:{array_seconds}")
-            seconds_arr = self.__b2array(second_bytes_list, self.format)
+            batch_array = self.__b2array(batch_bytes_list, self.format)
             if array is None:           # 获取起始帧
-                if not mute_check:
-                    array = seconds_arr
-                    array_seconds += 1
-                else:
-                    if not self.muteCheck(seconds_arr):
-                        array = seconds_arr
-                        array_seconds += 1
+                if not mute_check or not self.__muteEnergyCheck(batch_array):
+                    array = batch_array
+                    sum_read_times += chunk_read_times
             else:
-                array = np.vstack((array, seconds_arr))
-                array_seconds += 1
-                if array_seconds>=(seconds-2):
-                    if self.muteCheck(seconds_arr):
-                        break
-                if array_seconds>(seconds+10):
-                    break
-
-            read_times = 0
-            second_bytes_list = []
+                array = np.vstack((array, batch_array))
+                sum_read_times += chunk_read_times
+                if sum_read_times >= min_read_times:
+                    batch_times = int(second_read_times*0.5)
+                    if self.__muteEnergyCheck(batch_array):
+                        isDone = True
+                elif sum_read_times>max_read_times:
+                    isDone = True
+            logging.info(f"批次读取次数:{chunk_read_times}; 当前数据总次数:{sum_read_times}")
+            chunk_read_times = 0
+            batch_bytes_list = []
         
+        if self.isStop:
+            return None
         return array
 
     def run(self, 
@@ -284,7 +285,6 @@ class Recorder(object):
         save_wave:bool=False, 
         mute_check:bool=True,
         speech_completeness:bool=True,
-        return_array:bool=True,
         ):
         """ 
         Auto run. start the listen_t thread. 
@@ -295,17 +295,31 @@ class Recorder(object):
         :param seconds:     recording time length. in seconds.
         :param save_wave:   whether save the listen data to a wave file.
         :param mute_check:  whether to check the audio signal is mute or not.
-        :param return_array: Whether convert the raw audio data the a standard np.ndarray and return the array.
         """
+        if not self.isInit: raise RuntimeError(f"未初始化!")
         self.listenT = threading.Thread(target=self.listen_t, 
-                                        args=(seconds, save_wave, mute_check, speech_completeness, return_array), 
+                                        args=(seconds, save_wave, mute_check, speech_completeness), 
                                         daemon=True)
         self.listenT.start()
 
     def stop(self):
         """stop the liston loop."""
         self.isStop = True
-        logging.debug('Recorder stopping')
+        if self.isRunning:
+            stop_waiting_times = 0
+            while self.isRunning:
+                time.sleep(0.1)
+                stop_waiting_times += 1
+                if stop_waiting_times>10:
+                    break
+        if self.isRunning:
+            logging.warning('Recorder stop abnormal. The listed thread still on!')
+        if self.isInit:
+            self.isInit = False
+            self.PyStream.close()
+            self.PyStream = None
+            logging.info('PyStream closed')
+        logging.info('Recorder stopping')
 
     def get(self, isRealtime=True):
         """isRealtime=True: only keep and return the last result"""
@@ -320,15 +334,16 @@ class Recorder(object):
         return result
 
     @staticmethod
-    def muteCheck(
-        audio_signal:np.ndarray, 
-        sr:int=16000, 
-        frame_time_len:float = 0.1,
+    def __muteEnergyCheck(
+        audio_signal:np.ndarray,
+        framesize:int = 1024,
         threshold:float=0.001):
         """
         基于音频能量的静默检测.
-        将输入的声音数据进行分段[依据], 平方平均, 判断是否超过阈值。
+        将输入的声音数据进行分段[framesize], 平方平均, 判断是否超过阈值。
         并汇总整个分段后的结果。
+        @2025-1-6 日修改:
+          不以时间为分段,而是以读取数据的chunksize来进行分段。
 
         Parameters
         ----------
@@ -336,11 +351,8 @@ class Recorder(object):
         :audio_signal: np.ndarray
             standardlized input audio signal data. 
             Require: shape:(xxx, channels); dtype=float32; data range:[-1, 1]
-        :sr: int
-            sample rate for input audion signal data.
-        :frame_time_len: float
-            对输入数据进行分段的段窗口的时间长度, 单位"秒"。
-            如: 值0.1、sr=16000, 则意味着要将数据分成 1600个一段,进行能量计算和判断。
+        :framesize: int
+            数据进行分段的尺寸
         :param threshold: 
             能量阈值，低于此值认为是静默段
 
@@ -349,19 +361,21 @@ class Recorder(object):
         布尔值, 指示是否每一帧为静默(0:表示静默, 1:表示不静默)
         """
         audio_len = audio_signal.shape[0]
-        frame_size = int(sr*frame_time_len)
-        num_frames = audio_len//frame_size
+        num_frames = audio_len//framesize
+        if num_frames<=0:
+            logging.warning(f"能量检测异常! data_len={audio_len}, framesize={framesize}")
+            raise RuntimeError(f"能量检测异常! data_len={audio_len}, framesize={framesize}")
         silence = [0]*num_frames
         
-        logging.debug((f"能量检测开始: len={audio_len/sr}s, ch={audio_signal.shape[1]}, "
-                       f"frame_time_len={frame_time_len}s, threshold={threshold}"))
+        logging.debug("能量检测开始: data_len:{}, ch:{}, threshold:{}, framesize:{}, num_frames:{}".format(
+                    audio_len, audio_signal.shape[1], threshold, framesize, num_frames))
         for ch in range(audio_signal.shape[1]):
             ch_audio = audio_signal[:, ch]
             ch_silence = []
             e_list = []
             for i in range(num_frames):
-                start_idx = i * frame_size
-                end_idx = (i + 1) * frame_size
+                start_idx = i * framesize
+                end_idx = (i + 1) * framesize
                 frame = ch_audio[start_idx:end_idx]
                 # 计算当前帧的能量
                 energy = np.sum(np.square(frame)) / len(frame)  # 平均能量
@@ -372,18 +386,16 @@ class Recorder(object):
                     ch_silence.append(1)
                 if _IsDEBUG: e_list.append(energy)
             
-            silence = [x | y for x, y in zip(silence, ch_silence)]
+            silence = [x | y for x, y in zip(silence, ch_silence)]  
             if _IsDEBUG:
-                logging.debug(f"ch[{ch+1} of {audio_signal.shape[1]}] 切片数[{num_frames}]@切片时长{frame_time_len}s 之 能量列表:")
-                e_list_s = [f"{x:.4f}" for x in e_list]
-                for i in range(0, len(e_list_s), 10):
-                    print(" ".join(e_list_s[i:i+10]))
+                logging.debug("ch[{} of {}]\n切片能量:{}".format(
+                            ch+1, audio_signal.shape[1], np.round(e_list, 4)))
         sound_frames = sum(silence)
         if sound_frames==0:
             logging.debug(f"\033[31mIs Mute! 无声音!\033[0m")
             return True
         else:
-            logging.debug(f"\033[32m有声音: sound_frames={(sound_frames*frame_time_len):.1f}s of {audio_len/sr}s\033[0m")
+            logging.debug(f"\033[32m有声音: 能量切片数:{sound_frames}, 总切片数:{num_frames}\033[0m")
             return False
         
     def __b2array(self, bytes_list, sample_format):
@@ -455,7 +467,7 @@ class Recorder(object):
             wf.setframerate(Rate)
             wf.writeframes(b''.join(frames))
             duration = wf.getnframes()
-            logging.debug('时长:{:.2g}s. File[{}]:"{}"'.format(
+            logging.info('录音时长:{:.2g}s. 保存文件[{}]:"{}"'.format(
                 duration/self.framerate, self.audioId, file_name))
         return file_name
     
@@ -471,8 +483,9 @@ class Recorder(object):
     def __del__(self):
         if self.isInit:
             self.PyStream.close()
-            self.PyAudio.terminate()
-            logging.info("PyStream and PyAudio closed")
+            logging.info("PyStream closed")
+        self.PyAudio.terminate()
+        logging.info("PyAudio terminate")
 
 
 if __name__ == "__main__":
@@ -487,12 +500,14 @@ if __name__ == "__main__":
             print(f'\r   录音开始倒计时: {i} 秒', end='', flush=True)
             time.sleep(1)
         print('\r   开始录音  ........      ')
-        listen_res = recoder.listen(seconds=10, 
+        listen_res = recoder.listen(seconds=5, 
                                     save_wave=True, 
                                     mute_check=True, 
                                     speech_completeness=True
                                    )
-    # listen_test()
+        print(listen_res["array"].shape)
+        recoder.stop()
+    listen_test()
 
     def auto_run_test():
         log_init(LogFileName="recorder.log", logLevel=logging.DEBUG)
@@ -500,7 +515,7 @@ if __name__ == "__main__":
         recoder.init()
         logging.info("\033[34m recoder.init() ok.\033[0m")
         try:
-            recoder.run(seconds=10, 
+            recoder.run(seconds=5, 
                         save_wave=True, 
                         mute_check=True, 
                         speech_completeness=True
@@ -509,13 +524,12 @@ if __name__ == "__main__":
             # 模拟外部信号控制程序停止
             while True:
                 time.sleep(1)
-                user_input = input("Press 'q' to quit: ")
-                if user_input.lower() == 'q':
-                    recoder.stop()  # 停止采集线程
-                    break
+                curData = recoder.get(False)
+                if curData is not None:
+                    logging.info("\033[34m 取得数据. array.shape={}\033[0m".format(curData["array"].shape))
         except KeyboardInterrupt:
             recoder.stop()  # 在 Ctrl+C 时停止
         time.sleep(2)
         logging.info("\033[34mMain: Threads have been stopped.\033[0m")
     
-    auto_run_test()
+    # auto_run_test()

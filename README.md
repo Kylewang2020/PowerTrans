@@ -2,7 +2,26 @@
 
 Using SenseVoice-small onnx model to achieve realtime speech recognition locally on Pi 5B.
 
-## 主要功能
+## Introduction
+
+### 主要功能
+
+- [x] 实时字幕
+- [ ] 对视频文件制作字幕文件
+- [x] 实时语音识别
+
+### 主要功能实现
+
+#### 三个主要对象
+
+- 窗口对象myWin窗口
+  - 主窗口-参数的设置调整
+  - 字母弹窗-实现字幕的实时显示
+- 录音对象AudioCapture(实现实时音频的抓取)
+- Asr 模型对象封装
+
+#### 对象细节实现步骤
+
 - [ ] Recorder
   - [x] 选择录音设备[麦克风 or 扬声器] 并 初始化
   - [x] 实时进行音频录制
@@ -28,6 +47,16 @@ Using SenseVoice-small onnx model to achieve realtime speech recognition locally
   - 长时间
   - 低负载
 
+### SenseVoice
+
+- [SenseVoice](https://github.com/FunAudioLLM/SenseVoice) 是具有音频理解能力的音频基础模型, 包括:
+  - 语音识别(ASR)
+  - 语种识别(LID)
+  - 语音情感识别(SER)
+  - 声学事件分类(AEC)
+  - 声学事件检测(AED)
+- 当前SenseVoice-small支持中、粤、英、日、韩语的多语言语音识别, 情感识别和事件检测能力, 具有极低的推理延迟。
+
 ## 实现方式
 
 - 三个对象
@@ -51,4 +80,6 @@ Using SenseVoice-small onnx model to achieve realtime speech recognition locally
 
 ## Ref
 
-[Whisper](https://github.com/openai/whisper)
+1. 本项目借用并模仿了[SenseVoice-python](https://github.com/lovemefan/SenseVoice-python)的库文件和代码
+2. 参考了[FunAudioLLM/SenseVoice](https://github.com/FunAudioLLM/SenseVoice)
+3. 本项目参考并借用 kaldi-native-fbank中的fbank特征提取算法。 FunASR 中的lrf + cmvn 算法
